@@ -22,7 +22,18 @@ BASE_DIR = Path(__file__).resolve().parent
 # Load once when server starts
 
 
-movie_vectors = np.load(BASE_DIR / "movie_vectors.npy", allow_pickle=True)
+file_path = hf_hub_download(
+
+repo_id="Shrejankotyan2005/movie_vector",
+
+filename="movie_vectors.npy",
+
+repo_type="dataset"
+
+)
+
+movie_vectors = np.load(file_path, allow_pickle=True)
+
 movie_vectors_df = pd.DataFrame(movie_vectors, columns=COLUMNS)
 
 
