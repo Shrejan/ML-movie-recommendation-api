@@ -26,7 +26,7 @@ class Recommendation(BaseModel):
 @app.get("/")
 
 def home():
-    print("can uuu see mee")
+    
     return {
         "message": "Movie Recommendation API Running"
     }
@@ -36,9 +36,12 @@ def home():
     "/rec",
     response_model=List[Recommendation]
 )
+print(response_model)
+
 def recommend(user_movies: List[UserMovie]):
 
     try:
+        print(user_movies)
         payload = []
         for movie in user_movies:
             if hasattr(movie, "model_dump"):
@@ -47,6 +50,8 @@ def recommend(user_movies: List[UserMovie]):
                 payload.append(movie.dict())
 
         recommendations = recommend_movies(payload)
+        print(recommendations)
+        print(payload)
 
         return recommendations
 
