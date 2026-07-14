@@ -1,4 +1,4 @@
-# 🎬 AI Movie Recommendation API
+# 🎬 ML Movie Recommendation API
 
 > A Machine Learning-powered Movie Recommendation API built using Transformer-based movie embeddings and cosine similarity, capable of generating personalized movie recommendations from a user's watched and rated movies.
 
@@ -113,12 +113,54 @@ Accepts a list of user-rated movies and returns personalized recommendations.
 ```json
 [
   {
-    "imdbId": 1234567,
-    "score": 0.96
+    "movie_title": "Home Alone (1990)",
+    "imdbId": 99785,
+    "similarity": 0.855451226234436
   },
   {
-    "imdbId": 7654321,
-    "score": 0.94
+    "movie_title": "Casper (1995)",
+    "imdbId": 112642,
+    "similarity": 0.8552332520484924
+  },
+  {
+    "movie_title": "Mask, The (1994)",
+    "imdbId": 110475,
+    "similarity": 0.8511837124824524
+  },
+  {
+    "movie_title": "Santa Clause, The (1994)",
+    "imdbId": 111070,
+    "similarity": 0.8273487091064453
+  },
+  {
+    "movie_title": "Mrs. Doubtfire (1993)",
+    "imdbId": 107614,
+    "similarity": 0.7985343337059021
+  },
+  {
+    "movie_title": "Ace Ventura: When Nature Calls (1995)",
+    "imdbId": 112281,
+    "similarity": 0.7733047604560852
+  },
+  {
+    "movie_title": "Flintstones, The (1994)",
+    "imdbId": 109813,
+    "similarity": 0.7727760672569275
+  },
+  {
+    "movie_title": "Free Willy (1993)",
+    "imdbId": 106965,
+    "similarity": 0.7689676284790039
+  },
+  {
+    "movie_title": "Coneheads (1993)",
+    "imdbId": 106598,
+    "similarity": 0.7541904449462891
+  },
+  {
+    "movie_title": "Pocahontas (1995)",
+    "imdbId": 114148,
+    "similarity": 0.7504333853721619
   }
 ]
 ```
@@ -130,7 +172,7 @@ Accepts a list of user-rated movies and returns personalized recommendations.
 ### Clone Repository
 
 ```bash
-git clone https://github.com/yourusername/your-repository.git
+git clone https://github.com/Shrejan/ML-movie-recommendation-api
 ```
 
 ### Install Dependencies
@@ -142,7 +184,7 @@ pip install -r requirements.txt
 ### Start Server
 
 ```bash
-uvicorn main:app --reload
+uvicorn api:app --reload
 ```
 
 ---
