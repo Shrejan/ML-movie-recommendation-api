@@ -27,11 +27,16 @@ embeddings_path = hf_hub_download(
 metadata = pd.read_csv(metadata_path)
 embeddings = np.load(embeddings_path)
 
+
+print("Embeddings shape:", embeddings.shape)
+print("Embeddings dtype:", embeddings.dtype)
+
+
 # Ensure row alignment
 assert len(metadata) == len(embeddings)
 
 def recommend_movies(user_movies: List[dict], top_n: int = 10):
-
+    print("the function has started")
     ratings_map = {
         movie["imdbId"]: movie["rating"]
         for movie in user_movies
@@ -60,13 +65,13 @@ def recommend_movies(user_movies: List[dict], top_n: int = 10):
         axis=0,
         weights=weights
     ).reshape(1, -1)
-
+    print("cosine_similarity started")
     # Similarity against all movies
     similarities = cosine_similarity(
         user_vector,
         embeddings
     )[0]
-
+    print("cosine_similarity ended")
     top_idx = np.argsort(similarities)[::-1]
 
     watched_ids = set(ratings_map.keys())
@@ -87,8 +92,8 @@ def recommend_movies(user_movies: List[dict], top_n: int = 10):
                 "similarity": float(similarities[idx]),
             }
         )
-
+        
         if len(recommendations) >= top_n:
             break
-
+    print(recommendations)
     return recommendations
