@@ -117,19 +117,11 @@ def recommend_movies(user_movies: List[dict], top_n: int = 10):
 
     logging.info("Starting cosine similarity")
 
-    #similarities = cosine_similarity(
-     #   user_vector,
-     #   embeddings
-   # )[0]
-    user_vector = user_vector.flatten()
-
-    user_norm = np.linalg.norm(user_vector)
-
-    similarities = (
-    embeddings @ user_vector
-    ) / (
-    embedding_norms * user_norm + 1e-8
-    )
+    similarities = cosine_similarity(
+        user_vector,
+        embeddings
+    )[0]
+    
 
 
 
