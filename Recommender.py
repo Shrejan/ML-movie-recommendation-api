@@ -84,7 +84,11 @@ def recommend_movies(user_movies: List[dict], top_n: int = 10):
         f"watched_movie_matrix shape: {watched_movie_matrix.shape}"
     )
 
-    weights = rows["imdbId"].map(ratings_map).values
+    
+    weights = rows["imdbId"].map(
+    ratings_map
+    ).values.astype(np.float32)
+
 
     logging.info(f"weights: {weights}")
     logging.info(f"weights shape: {weights.shape}")
@@ -92,10 +96,10 @@ def recommend_movies(user_movies: List[dict], top_n: int = 10):
     logging.info("Building user vector")
 
     user_vector = np.average(
-        watched_movie_matrix,
-        axis=0,
-        weights=weights
-    ).reshape(1, -1)
+    watched_movie_matrix,
+    axis=0,
+    weights=weights
+    ).astype(np.float32).reshape(1, -1)
 
     logging.info(
         f"user_vector shape: {user_vector.shape}"
@@ -113,10 +117,22 @@ def recommend_movies(user_movies: List[dict], top_n: int = 10):
 
     logging.info("Starting cosine similarity")
 
-    similarities = cosine_similarity(
-        user_vector,
-        embeddings
-    )[0]
+    #similarities = cosine_similarity(
+     #   user_vector,
+     #   embeddings
+   # )[0]
+    user_vector = user_vector.flatten()
+
+    user_norm = np.linalg.norm(user_vector)
+
+    similarities = (
+    embeddings @ user_vector
+    ) / (
+    embedding_norms * user_norm + 1e-8
+    )
+
+
+
 
     logging.info("Cosine similarity completed")
 
