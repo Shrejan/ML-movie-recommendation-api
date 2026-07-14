@@ -61,14 +61,14 @@ def recommend(user_movies: List[UserMovie]):
         payload = []
 
         for i, movie in enumerate(user_movies):
-            logger.info(f"Processing movie {i+1}")
+            
 
             if hasattr(movie, "model_dump"):
                 movie_dict = movie.model_dump()
             else:
                 movie_dict = movie.dict()
 
-            logger.info(f"Movie Data: {movie_dict}")
+            
             payload.append(movie_dict)
 
         logger.info("Payload successfully created.")
