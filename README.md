@@ -10,7 +10,6 @@
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
 ---
-
 # 📖 Overview
 
 This project is a **Machine Learning-based Movie Recommendation System** that generates highly relevant movie recommendations based on a user's movie preferences.
