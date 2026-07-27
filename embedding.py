@@ -16,6 +16,7 @@ def load_model() -> None:
     global _model
     if _model is None:
         _model = SentenceTransformer(settings.EMBEDDING_MODEL, device="cpu")
+        _model.half()
 
 
 def get_embedding(text: str) -> list[float]:
