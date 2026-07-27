@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: movie-recommendation-service
+    env: python
+    plan: free
+    buildCommand: pip install --no-cache-dir -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1
+    envVars:
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: QDRANT_COLLECTION
+        value: movies
+      - key: EMBEDDING_MODEL
+        value: all-MiniLM-L6-v2
+      - key: TOP_K
+        value: "10"
+      - key: MAX_CONCURRENT_EMBEDDINGS
+        value: "4"
