@@ -3,4 +3,5 @@ uvicorn[standard]==0.30.6
 qdrant-client==1.10.1
 pydantic==2.9.2
 numpy==1.26.4
+requests
 
