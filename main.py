@@ -1,8 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
-
 from fastapi import FastAPI, HTTPException
-
+import numpy as np
 from config import settings
 from models import RecommendRequest, RecommendResponse, MovieRecommendationResult, RecommendedMovie
 from embedding import load_model, build_movie_vectors_batch
@@ -33,15 +32,14 @@ async def recommend(request: RecommendRequest):
 
     top_k = request.top_k or settings.TOP_K
     vectors = await build_movie_vectors_batch(request.movies)
-    
     results: list[MovieRecommendationResult] = []
     for movie, vector in zip(request.movies, vectors):
         hits, applied_filter = search(vector, top_k, request.language_filter)
         valid_hits = validate_results(hits, applied_filter)
-
+    
         if request.movies and not valid_hits and hits:
             logger.warning("All hits for '%s' failed validation", movie.title)
-
+    
         recommendations = [
             RecommendedMovie(
                 tmdb_id=hit.payload.get("tmdb_id"),
@@ -52,9 +50,8 @@ async def recommend(request: RecommendRequest):
             )
             for hit in valid_hits
         ]
-       
+    
         results.append(MovieRecommendationResult(input_title=movie.title, recommendations=recommendations))
-        del vector
     
     return RecommendResponse(results=results)
 

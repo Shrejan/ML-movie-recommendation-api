@@ -20,12 +20,11 @@ if not _HF_TOKEN:
         "HF_TOKEN environment variable is not set. "
         "Add it to your .env file locally, or to your Render service's Environment tab."
     )
-
+  # Debugging line to confirm token is read
 # NOTE: api-inference.huggingface.co is deprecated (returns 410 / DNS failure).
 # Must use router.huggingface.co instead.
 _HF_API_URL = (
-    f"https://router.huggingface.co/hf-inference/models/"
-    f"{settings.EMBEDDING_MODEL}/pipeline/feature-extraction"
+    f"https://router.huggingface.co/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction"
 )
 _HF_HEADERS = {"Authorization": f"Bearer {_HF_TOKEN}"}
 _HF_SESSION = requests.Session()  # reuse TCP connection across calls
@@ -75,7 +74,7 @@ def get_embedding(text: str, retries: int = _MAX_RETRIES) -> list[float]:
         if response.status_code == 200:
             try:
                 data = response.json()
-                vec = np.array(data[0], dtype=np.float32)
+                vec = np.array(data[0], dtype=np.float32)  # HF returns a list of lists; we want the first (and only) vector
             except (ValueError, IndexError, KeyError) as e:
                 last_error = RuntimeError(f"Malformed HF response body: {e}")
                 attempt += 1
@@ -134,7 +133,7 @@ def _build_movie_text(movie: MovieInput) -> str:
 async def build_movie_vector(movie: MovieInput) -> list[float]:
     """Generate a single embedding from all movie information."""
     text = _build_movie_text(movie)
-
+    
     loop = asyncio.get_running_loop()
 
     async with _semaphore:
@@ -142,7 +141,7 @@ async def build_movie_vector(movie: MovieInput) -> list[float]:
             None,
             lambda: get_embedding(text)
         )
-
+    
     return vector
 
 
