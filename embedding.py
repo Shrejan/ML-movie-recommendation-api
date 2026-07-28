@@ -30,6 +30,11 @@ _HF_API_URL = (
 _HF_HEADERS = {"Authorization": f"Bearer {_HF_TOKEN}"}
 _HF_SESSION = requests.Session()  # reuse TCP connection across calls
 
+# Separate budgets: real failures (network/5xx-non-503) vs. cold-start (503) waits.
+_MAX_RETRIES = 3
+_MAX_COLD_START_WAITS = 5
+_DEFAULT_COLD_START_WAIT = 5  # seconds, used if HF doesn't give us an estimate
+
 
 def load_model() -> None:
     """
@@ -40,26 +45,42 @@ def load_model() -> None:
     return None
 
 
-def get_embedding(text: str, retries: int = 3) -> list[float]:
+def get_embedding(text: str, retries: int = _MAX_RETRIES) -> list[float]:
     """
     Reusable, thread-safe embedding function. Returns a normalized float32 vector.
     Same signature/return type as the local sentence-transformers version.
+
+    Retry budgets are tracked separately:
+      - `retries`: genuine failures (network errors, non-200/503 HTTP errors)
+      - cold-start waits (HTTP 503): tracked independently via _MAX_COLD_START_WAITS,
+        so a model that's simply warming up doesn't eat into the "real error" budget.
     """
     payload = {"inputs": [text]}
 
     last_error: Exception | None = None
-    for attempt in range(retries):
+    cold_start_waits = 0
+    attempt = 0
+
+    while attempt < retries:
         try:
-            response = _HF_SESSION.post(_HF_API_URL, headers=_HF_HEADERS, json=payload, timeout=30)
+            response = _HF_SESSION.post(
+                _HF_API_URL, headers=_HF_HEADERS, json=payload, timeout=30
+            )
         except requests.RequestException as e:
             last_error = e
-            time.sleep(2 * (attempt + 1))
+            attempt += 1
+            time.sleep(2 * attempt)
             continue
 
         if response.status_code == 200:
-            data = response.json()
-            # Expected shape: [[float, float, ...]] -> one pooled vector per input sentence
-            vec = np.array(data[0], dtype=np.float32)
+            try:
+                data = response.json()
+                vec = np.array(data[0], dtype=np.float32)
+            except (ValueError, IndexError, KeyError) as e:
+                last_error = RuntimeError(f"Malformed HF response body: {e}")
+                attempt += 1
+                time.sleep(2 * attempt)
+                continue
 
             # The HF endpoint for this model already returns a mean-pooled vector,
             # but it does NOT guarantee L2 normalization like sentence-transformers'
@@ -70,8 +91,20 @@ def get_embedding(text: str, retries: int = 3) -> list[float]:
             return vec.astype(np.float32).tolist()
 
         elif response.status_code == 503:
-            # Model is loading (cold start) — wait and retry
-            wait = response.json().get("estimated_time", 5)
+            # Model is loading (cold start) — wait and retry, on its own budget
+            # so repeated cold-start waits don't get mistaken for real failures.
+            if cold_start_waits >= _MAX_COLD_START_WAITS:
+                last_error = RuntimeError(
+                    "HF model did not finish loading after "
+                    f"{_MAX_COLD_START_WAITS} cold-start waits"
+                )
+                break
+            try:
+                wait = response.json().get("estimated_time", _DEFAULT_COLD_START_WAIT)
+            except ValueError:
+                # Response body wasn't valid JSON (e.g. gateway timeout page)
+                wait = _DEFAULT_COLD_START_WAIT
+            cold_start_waits += 1
             time.sleep(wait)
             continue
 
@@ -79,40 +112,38 @@ def get_embedding(text: str, retries: int = 3) -> list[float]:
             last_error = RuntimeError(
                 f"HF API error {response.status_code}: {response.text[:300]}"
             )
-            time.sleep(2 * (attempt + 1))
+            attempt += 1
+            time.sleep(2 * attempt)
 
-    raise RuntimeError(f"Embedding request failed after {retries} retries: {last_error}")
+    raise RuntimeError(f"Embedding request failed after {attempt} retries: {last_error}")
 
 
-def _build_field_groups(movie: MovieInput) -> tuple[str, str, str]:
-    # Three semantically distinct text groups built from the JSON payload.
-    group_plot = f"title: {movie.title}. overview: {movie.overview or ''}"
-    group_taxonomy = (
-        f"genres: {', '.join(movie.genres or [])}. "
-        f"keywords: {', '.join(movie.keywords or [])}"
+def _build_movie_text(movie: MovieInput) -> str:
+    return (
+        f"Title: {movie.title}. "
+        f"Overview: {movie.overview or ''}. "
+        f"Genres: {', '.join(movie.genres or [])}. "
+        f"Keywords: {', '.join(movie.keywords or [])}. "
+        f"Director: {movie.director or ''}. "
+        f"Cast: {', '.join(movie.cast or [])}. "
+        f"Release Year: {movie.release_year or ''}. "
+        f"Language: {movie.language or ''}."
     )
-    group_people = (
-        f"director: {movie.director or ''}. cast: {', '.join(movie.cast or [])}. "
-        f"release_year: {movie.release_year or ''}. language: {movie.language or ''}"
-    )
-    return group_plot, group_taxonomy, group_people
 
 
 async def build_movie_vector(movie: MovieInput) -> list[float]:
-    """Generate 3 embeddings from distinct field groups and combine into one user vector."""
-    groups = _build_field_groups(movie)
+    """Generate a single embedding from all movie information."""
+    text = _build_movie_text(movie)
+
     loop = asyncio.get_running_loop()
+
     async with _semaphore:
-        vectors = await loop.run_in_executor(
+        vector = await loop.run_in_executor(
             None,
-            lambda: [np.array(get_embedding(g), dtype=np.float32) for g in groups],
+            lambda: get_embedding(text)
         )
-    combined = np.mean(vectors, axis=0)
-    norm = np.linalg.norm(combined)
-    if norm > 0:
-        combined = combined / norm
-    del vectors
-    return combined.astype(np.float32).tolist()
+
+    return vector
 
 
 async def build_movie_vectors_batch(movies: list[MovieInput]) -> list[list[float]]:
