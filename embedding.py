@@ -1,30 +1,77 @@
 from __future__ import annotations  # <-- added for Python 3.9 compatibility
 
 import asyncio
+import time
 import numpy as np
-from sentence_transformers import SentenceTransformer
+import requests
 
 from config import settings
 from models import MovieInput
 
-_model: SentenceTransformer | None = None
 _semaphore = asyncio.Semaphore(settings.MAX_CONCURRENT_EMBEDDINGS)
+
+# --- HF Inference API config ---
+# NOTE: api-inference.huggingface.co is deprecated (returns 410 / DNS failure).
+# Must use router.huggingface.co instead.
+_HF_API_URL = (
+    f"https://router.huggingface.co/hf-inference/models/"
+    f"{settings.EMBEDDING_MODEL}/pipeline/feature-extraction"
+)
+_HF_HEADERS = {"Authorization": f"Bearer {settings.HF_TOKEN}"}
+_HF_SESSION = requests.Session()  # reuse TCP connection across calls
 
 
 def load_model() -> None:
-    """Load the embedding model once at startup. Call from FastAPI lifespan."""
-    global _model
-    if _model is None:
-        _model = SentenceTransformer(settings.EMBEDDING_MODEL, device="cpu")
-        _model.half()
+    """
+    No local model to load anymore — embeddings are generated via the
+    HuggingFace Inference API. Kept as a no-op so existing FastAPI
+    lifespan code doesn't need to change.
+    """
+    return None
 
 
-def get_embedding(text: str) -> list[float]:
-    """Reusable, thread-safe embedding function. Returns a normalized float32 vector."""
-    if _model is None:
-        raise RuntimeError("Embedding model not loaded. Call load_model() at startup.")
-    vec = _model.encode(text, convert_to_numpy=True, normalize_embeddings=True)
-    return vec.astype(np.float32).tolist()
+def get_embedding(text: str, retries: int = 3) -> list[float]:
+    """
+    Reusable, thread-safe embedding function. Returns a normalized float32 vector.
+    Same signature/return type as the local sentence-transformers version.
+    """
+    payload = {"inputs": [text]}
+
+    last_error: Exception | None = None
+    for attempt in range(retries):
+        try:
+            response = _HF_SESSION.post(_HF_API_URL, headers=_HF_HEADERS, json=payload, timeout=30)
+        except requests.RequestException as e:
+            last_error = e
+            time.sleep(2 * (attempt + 1))
+            continue
+
+        if response.status_code == 200:
+            data = response.json()
+            # Expected shape: [[float, float, ...]] -> one pooled vector per input sentence
+            vec = np.array(data[0], dtype=np.float32)
+
+            # The HF endpoint for this model already returns a mean-pooled vector,
+            # but it does NOT guarantee L2 normalization like sentence-transformers'
+            # normalize_embeddings=True does. Normalize here to match local behavior.
+            norm = np.linalg.norm(vec)
+            if norm > 0:
+                vec = vec / norm
+            return vec.astype(np.float32).tolist()
+
+        elif response.status_code == 503:
+            # Model is loading (cold start) — wait and retry
+            wait = response.json().get("estimated_time", 5)
+            time.sleep(wait)
+            continue
+
+        else:
+            last_error = RuntimeError(
+                f"HF API error {response.status_code}: {response.text[:300]}"
+            )
+            time.sleep(2 * (attempt + 1))
+
+    raise RuntimeError(f"Embedding request failed after {retries} retries: {last_error}")
 
 
 def _build_field_groups(movie: MovieInput) -> tuple[str, str, str]:
