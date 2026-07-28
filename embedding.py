@@ -1,6 +1,7 @@
 from __future__ import annotations  # <-- added for Python 3.9 compatibility
 
 import asyncio
+import os
 import time
 import numpy as np
 import requests
@@ -11,13 +12,22 @@ from models import MovieInput
 _semaphore = asyncio.Semaphore(settings.MAX_CONCURRENT_EMBEDDINGS)
 
 # --- HF Inference API config ---
+# Token is read directly from the environment (set via .env / Render dashboard),
+# not from config.py/settings, per your setup.
+_HF_TOKEN = os.environ.get("HF_TOKEN")
+if not _HF_TOKEN:
+    raise RuntimeError(
+        "HF_TOKEN environment variable is not set. "
+        "Add it to your .env file locally, or to your Render service's Environment tab."
+    )
+
 # NOTE: api-inference.huggingface.co is deprecated (returns 410 / DNS failure).
 # Must use router.huggingface.co instead.
 _HF_API_URL = (
     f"https://router.huggingface.co/hf-inference/models/"
     f"{settings.EMBEDDING_MODEL}/pipeline/feature-extraction"
 )
-_HF_HEADERS = {"Authorization": f"Bearer {settings.HF_TOKEN}"}
+_HF_HEADERS = {"Authorization": f"Bearer {_HF_TOKEN}"}
 _HF_SESSION = requests.Session()  # reuse TCP connection across calls
 
 
