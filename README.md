@@ -1,6 +1,6 @@
 # 🎬 ML Movie Recommendation API
 
-> A Machine Learning-powered Movie Recommendation API built using Transformer-based movie embeddings and cosine similarity, capable of generating personalized movie recommendations from a user's watched and rated movies.
+> A Machine Learning-powered Movie Recommendation API built using Transformer-based movie embeddings and cosine similarity and k nearest neighbour , capable of generating personalized movie recommendations from a user's watched and rated movies.
 
 ![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-API-009688.svg)
