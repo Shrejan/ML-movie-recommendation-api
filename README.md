@@ -47,6 +47,7 @@ The API is built with **FastAPI** and deployed on **Render** for production use.
 
 ### Deployment
 - Render
+- Qudrant
 
 ---
 
